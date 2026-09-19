@@ -386,13 +386,13 @@
   // (AES-GCM) et persistée dans localStorage — donc cet écran ne s'affiche
   // qu'au premier lancement sur chaque appareil/navigateur.
   const FIREBASE_CONFIG = {
-    apiKey:            "AIzaSyCQA971XZwNP6Zlprt8EsofaWJXz1LjfU4",
-    authDomain:        "triomphant-mmb-service.firebaseapp.com",
-    projectId:         "triomphant-mmb-service",
-    storageBucket:     "triomphant-mmb-service.firebasestorage.app",
-    messagingSenderId: "53427091291",
-    appId:             "1:53427091291:web:9f6b0d6b0ed559ab070c7e",
-    measurementId:     ""
+    apiKey:            "AIzaSyATa_tOvEbGROCIZ9xZgkAsr_--d2vYIjc",
+    authDomain:        "triomphant-v2.firebaseapp.com",
+    projectId:         "triomphant-v2",
+    storageBucket:     "triomphant-v2.firebasestorage.app",
+    messagingSenderId: "908578874554",
+    appId:             "1:908578874554:web:5c008fba39204ce6c24e83",
+    measurementId:     "G-STQHJF83X2"
   };
   // ✅ FIN DE LA CONFIGURATION
   window.FIREBASE_CONFIG = FIREBASE_CONFIG;
@@ -692,6 +692,7 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
         <select id="filter-com" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--text);font-size:11px;outline:none;" onchange="onClFilterChange()"><option value="">— Sélectionner un commercial —</option></select>
         <input type="text" id="filter-quartier" placeholder="🏘️ Quartier…" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--text);font-size:11px;outline:none;width:130px;" oninput="dRender('onClFilterChange')">
         <button class="btn btn-ghost btn-sm" onclick="printClients()">🖨️ Imprimer</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportListeClientsExcel()">📊 Exporter (Excel)</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;">📥 Importer Excel/CSV<input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleImport(event)"></label>
         <button class="btn btn-ghost btn-sm" onclick="openM('m-import-guide')">❓ Guide Access</button>
         <button class="btn btn-primary btn-sm" onclick="openM('m-client')">+ Nouveau client</button>
@@ -1063,6 +1064,14 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
       <input type="date" id="dl-date-fin" oninput="renderDemandesLivraison()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);">
       <button class="btn btn-ghost btn-xs" onclick="document.getElementById('dl-date-debut').value='';document.getElementById('dl-date-fin').value='';renderDemandesLivraison();">✕ Dates</button>
       <span id="dl-date-count" style="font-size:11px;color:var(--muted);"></span>
+    </div>
+    <!-- Filtre par statut -->
+    <div id="dl-filtre-statut-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      <span style="font-size:11px;color:var(--muted);font-weight:600;margin-right:2px;">Statut :</span>
+      <button class="prod-filter-chip active" onclick="filtrerDemandesStatut('',this)">Toutes (<span id="dl-cnt-toutes">0</span>)</button>
+      <button class="prod-filter-chip" onclick="filtrerDemandesStatut('en_attente',this)">⏳ En attente (<span id="dl-cnt-en_attente">0</span>)</button>
+      <button class="prod-filter-chip" onclick="filtrerDemandesStatut('partielle',this)">⚠️ Partielle (<span id="dl-cnt-partielle">0</span>)</button>
+      <button class="prod-filter-chip" onclick="filtrerDemandesStatut('cloturee',this)">✅ Clôturée (<span id="dl-cnt-cloturee">0</span>)</button>
     </div>
     <div id="dl-liste"></div>
   </div>
@@ -1664,6 +1673,9 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
       <select id="dep-filtre-commercial" onchange="renderDepensesCommerciaux()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text);font-size:11px;outline:none;">
         <option value="">— Tous les commerciaux —</option>
       </select>
+      <select id="dep-filtre-nature" onchange="renderDepensesCommerciaux()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text);font-size:11px;outline:none;">
+        <option value="">— Toutes les natures —</option>
+      </select>
       <input type="date" id="dep-filtre-date-debut" onchange="renderDepensesCommerciaux()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text);font-size:11px;outline:none;">
       <span style="font-size:11px;color:var(--muted);">à</span>
       <input type="date" id="dep-filtre-date-fin" onchange="renderDepensesCommerciaux()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text);font-size:11px;outline:none;">
@@ -2227,6 +2239,29 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
     <div class="ma">
       <button class="btn btn-ghost btn-sm" onclick="exportDetailProdCoursCSV()" style="margin-right:auto;">⬇️ Export CSV</button>
       <button class="btn btn-ghost" onclick="closeM('m-prodcours-detail')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL CLIENTS EN COURS PAR PRODUIT (badge carte/fiche produit) -->
+<div class="mo" id="m-prodclients-detail">
+  <div class="md md-lg">
+    <div class="md-title" id="m-prodclients-detail-title">👥 Clients en cours — Produit</div>
+    <div id="m-prodclients-detail-kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
+    <input type="text" id="m-prodclients-detail-search" placeholder="🔍 Rechercher un client..."
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;outline:none;margin-bottom:10px;"
+      oninput="filterProdClientsDetailSearch()">
+    <div class="tw" style="max-height:380px;overflow-y:auto;">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Client</th><th>Téléphone</th><th>Commercial</th><th>% payé</th><th>Reste à payer</th>
+        </tr></thead>
+        <tbody id="m-prodclients-detail-body"></tbody>
+      </table>
+    </div>
+    <div class="ma">
+      <button class="btn btn-ghost btn-sm" onclick="exportDetailClientsProduitCSV()" style="margin-right:auto;">⬇️ Export CSV</button>
+      <button class="btn btn-ghost" onclick="closeM('m-prodclients-detail')">Fermer</button>
     </div>
   </div>
 </div>
@@ -2867,9 +2902,10 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="import-chk-adhesion" checked style="cursor:pointer;">🎫 Droit d'adhésion</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="import-chk-paye" checked style="cursor:pointer;">✅ Montant déjà payé</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="import-chk-divers" checked style="cursor:pointer;">🧾 Montant divers (pénalité/remise/frais)</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="import-chk-contrat" style="cursor:pointer;">📋 Contrat (code produit)</label>
     </div>
     <div class="ib ib-blue" style="font-size:11px;margin-bottom:10px;">
-      ℹ️ Si le <strong>code client</strong> d'une ligne correspond à un client déjà existant dans l'appli, ses informations de base ne seront <strong>pas modifiées</strong> — seules les informations cochées ci-dessus (cotisation, adhésion, paiement, divers) lui seront <strong>ajoutées</strong>.
+      ℹ️ Si le <strong>code client</strong> d'une ligne correspond à un client déjà existant dans l'appli, ses informations de base ne seront <strong>pas modifiées</strong> — seules les informations cochées ci-dessus (cotisation, adhésion, paiement, divers) lui seront <strong>ajoutées</strong>. Exception : <strong>« Contrat (code produit) »</strong>, si cochée, <strong>remplace</strong> le contrat déjà enregistré du client par la valeur du fichier (colonne « contrat »/« produit »/« designation ») — mettez-y le <strong>code du produit</strong> (ex: MOB-001) pour qu'il soit reconnu automatiquement ; sinon le texte est importé tel quel.
     </div>
     <div class="tw" style="max-height:280px;overflow-y:auto;margin-bottom:10px;">
       <table><thead><tr><th>#</th><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Contrat</th><th>Cotis./j</th><th>Déjà payé</th><th>Début</th><th>Adhésion</th><th>Divers</th><th>Code client</th><th>Statut</th></tr></thead>
@@ -3015,6 +3051,11 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
       <div id="pz-stock-wrap" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
         <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Stock disponible théorique</div>
         <div id="pz-stock" style="font-size:18px;font-weight:800;font-family:'Space Grotesk',sans-serif;"></div>
+      </div>
+      <!-- Clients en cours (chef d'agence / admin / gestionnaire de stock) -->
+      <div id="pz-clients-wrap" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">👥 Clients en cours sur ce produit</div>
+        <div id="pz-clients" style="font-size:18px;font-weight:800;font-family:'Space Grotesk',sans-serif;"></div>
       </div>
       <!-- Composition -->
       <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🔧 Composition</div>
