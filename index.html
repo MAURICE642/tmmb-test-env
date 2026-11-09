@@ -3,6 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- ══ VOLET 68 ══ Mode de visibilité (sombre par défaut / clair). Appliqué
+     AVANT le rendu pour éviter tout clignotement. Le choix est mémorisé par
+     appareil. Disponible sur tous les comptes via le bouton ☀️/🌙 de la barre. -->
+<script>
+(function(){
+  try{ if(localStorage.getItem('mmb_theme')==='light') document.documentElement.setAttribute('data-theme','light'); }catch(e){}
+  function _majBoutonTheme(){
+    var b=document.getElementById('btn-theme'); if(!b) return;
+    var clair = document.documentElement.getAttribute('data-theme')==='light';
+    b.textContent = clair ? '☀️' : '🌙';
+    b.title = clair ? 'Passer en mode sombre' : 'Passer en mode clair';
+  }
+  window._majBoutonTheme=_majBoutonTheme;
+  window.basculerTheme=function(){
+    var clair = document.documentElement.getAttribute('data-theme')==='light';
+    var suivant = clair ? 'dark' : 'light';
+    if(suivant==='light') document.documentElement.setAttribute('data-theme','light');
+    else document.documentElement.removeAttribute('data-theme');
+    try{ localStorage.setItem('mmb_theme', suivant); }catch(e){}
+    _majBoutonTheme();
+  };
+  document.addEventListener('DOMContentLoaded', _majBoutonTheme);
+})();
+</script>
 <!-- CSP : 'unsafe-inline' est nécessaire sur script-src/style-src car l'app
      utilise ~460 attributs onclick/onchange/oninput et des style="" inline.
      Retirer 'unsafe-inline' casserait l'app entière ; ça demanderait de migrer
@@ -386,13 +410,13 @@
   // (AES-GCM) et persistée dans localStorage — donc cet écran ne s'affiche
   // qu'au premier lancement sur chaque appareil/navigateur.
   const FIREBASE_CONFIG = {
-    apiKey:            "AIzaSyCQA971XZwNP6Zlprt8EsofaWJXz1LjfU4",
-    authDomain:        "triomphant-mmb-service.firebaseapp.com",
-    projectId:         "triomphant-mmb-service",
-    storageBucket:     "triomphant-mmb-service.firebasestorage.app",
-    messagingSenderId: "53427091291",
-    appId:             "1:53427091291:web:9f6b0d6b0ed559ab070c7e",
-    measurementId:     ""
+    apiKey:            "AIzaSyATa_tOvEbGROCIZ9xZgkAsr_--d2vYIjc",
+    authDomain:        "triomphant-v2.firebaseapp.com",
+    projectId:         "triomphant-v2",
+    storageBucket:     "triomphant-v2.firebasestorage.app",
+    messagingSenderId: "908578874554",
+    appId:             "1:908578874554:web:5c008fba39204ce6c24e83",
+    measurementId:     "G-STQHJF83X2"
   };
   // ✅ FIN DE LA CONFIGURATION
   window.FIREBASE_CONFIG = FIREBASE_CONFIG;
@@ -496,6 +520,43 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
      regle manquante rendrait le menu inutilisable. Les selecteurs sont
      prefixes .nav-grp / .nav-sec-clic pour ne rien recouvrir d'existant. -->
 <style>
+  /* ══ VOLET 69 ══ MODE CLAIR — surcharge complète (basée sur le vrai
+     styles.min.css fourni). Les variables ET les couleurs « en dur » des
+     en-têtes de tableaux / cartes KPI / sidebar / en-têtes chat sont
+     neutralisées en mode clair. */
+  /* ══ VOLET 69 ══ MODE CLAIR complet (basé sur le vrai styles.min.css) ══ */
+  :root[data-theme="light"]{
+    --bg:#f4f6fa; --surface:#ffffff; --surface2:#eef1f7;
+    --border:#e2e6ee; --text:#1b2130; --muted:#5b6374; --subtle:#6b7488;
+    --accent:#a67f22; --accent-dim:rgba(166,127,34,0.12); --accent-border:rgba(166,127,34,0.30);
+    --accent2:#12a97e; --accent3:#a67f22; --danger:#d14336; --warn:#b5701f;
+  }
+  :root[data-theme="light"] body{ background:var(--bg); color:var(--text); }
+  /* En-têtes de tableaux (étaient en dur !important) */
+  :root[data-theme="light"] #page-admin-dashboard .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-tous-clients .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-controle .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-articles .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-stock .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-livraisons .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-saisie-adhesions .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-historique .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-commerciaux .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-recouvrement .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-gstock-periode .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-transfert-resiliation .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-rapport-activite .tw thead th{ background:#e9edf5!important; color:var(--text)!important; }
+  /* Cartes KPI (étaient en dur !important) */
+  :root[data-theme="light"] #page-saisie-adhesions .kpi-card{ background:#ffffff!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-rapport-activite .kpi-card{ background:#ffffff!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-admin-dashboard .kpi-card{ background:#ffffff!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-livraisons .kpi-card{ background:#ffffff!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-admin-dashboard .kpi-card{ background:#ffffff!important; color:var(--text)!important; }
+  :root[data-theme="light"] #page-stock .kpi-card{ background:#ffffff!important; color:var(--text)!important; }
+  /* Barre latérale + en-têtes chat/notifications (étaient en dur) */
+  :root[data-theme="light"] #sidebar{ background:linear-gradient(180deg,#ffffff 0,#eef1f7 100%)!important; }
+  :root[data-theme="light"] .chat-hdr, :root[data-theme="light"] .notif-hdr{ background:var(--surface2)!important; color:var(--text); }
+
   /* ══ VOLET 22 ══ Habillage « rail doré » du menu repliable.
      Ce bloc est dans le <body>, donc APRES styles.min.css dans l'ordre des
      sources : a specificite egale, ce sont ces regles qui gagnent. Les
@@ -632,6 +693,9 @@ window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight
     <div class="page-title" id="pg-title">—</div>
     <div class="topbar-right">
       <span class="today-pill" id="today-pill"></span>
+      <!-- ══ VOLET 68 ══ bascule mode sombre / clair (tous les comptes) -->
+      <button class="btn btn-ghost no-print" id="btn-theme" onclick="basculerTheme()" title="Passer en mode clair"
+        aria-label="Changer le mode d'affichage" style="padding:8px 14px;font-size:20px;line-height:1;">🌙</button>
       <button class="btn btn-ghost no-print" id="btn-refresh" onclick="actualiserSysteme()" title="Actualiser les données"
         style="padding:8px 14px;font-size:20px;line-height:1;" title="Actualiser">↻</button>
       <button class="btn btn-primary no-print" id="btn-top" style="display:none" onclick="topAction()">+ Action</button>
