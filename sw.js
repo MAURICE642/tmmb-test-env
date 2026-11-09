@@ -17,7 +17,7 @@
 // ⚠️ Incrémenter ce numéro à chaque déploiement pour forcer la mise à jour
 // du shell chez les utilisateurs (sinon ils resteraient bloqués sur une
 // version en cache). Ex : 'mmb-shell-v2', 'mmb-shell-v3', ...
-const CACHE_NAME = 'mmb-shell-v4';
+const CACHE_NAME = 'mmb-shell-v64';   // ── VOLET 64 ── doit contenir APP_VERSION ('v64'), cf. controle 14 de verifier.js
 
 // Fichiers du shell applicatif à mettre en cache dès l'installation.
 // Volontairement minimal et 100% same-origin (pas de CDN externe ici —
@@ -54,16 +54,28 @@ self.addEventListener('install', (event) => {
 
 // ── ACTIVATE : nettoie les anciens caches (versions précédentes) ──
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim(); // prend le contrôle immédiatement, sans attendre un rechargement
+  event.waitUntil((async () => {
+    // Nettoyage des anciennes versions du cache.
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+    );
+
+    // ── NAVIGATION PRELOAD ──
+    // Sans cela, une navigation attend que le Service Worker démarre AVANT
+    // que la requête réseau ne parte : sur un téléphone lent, le démarrage
+    // du worker coûte à lui seul plusieurs centaines de millisecondes, et
+    // ce temps est perdu. Avec le preload, le navigateur lance la requête
+    // EN PARALLÈLE du démarrage du worker. Ignoré silencieusement par les
+    // navigateurs qui ne le supportent pas (Safari).
+    if (self.registration.navigationPreload) {
+      try { await self.registration.navigationPreload.enable(); } catch (e) { /* non supporté */ }
+    }
+
+    // clients.claim() DANS le waitUntil : sinon l'activation pouvait être
+    // considérée terminée avant que la prise de contrôle soit effective.
+    await self.clients.claim();
+  })());
 });
 
 // ── MESSAGE : reçoit l'ordre de l'utilisateur (via app.js) d'activer la
@@ -72,6 +84,60 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+  // ── VOLET 59 ── app.js vérifie que ce service worker sait afficher un
+  // push AVANT d'inscrire l'appareil (un ancien sw.js ne répond pas).
+  if (event.data && event.data.type === 'PUSH_PING' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ push: 1 });
+  }
+});
+
+// ── VOLET 59 ── PUSH : nouveau message de chat, application FERMÉE ──
+// Envoyé par la Cloud Function notifierNouveauMessage (message « data »
+// Firebase Cloud Messaging). Aucune donnée métier n'est lue ni écrite ici.
+// Si l'app est déjà au premier plan, on n'affiche rien : elle signale déjà
+// le message elle-même (son + bandeau), inutile de doubler.
+self.addEventListener('push', (event) => {
+  let p = {};
+  try { p = event.data ? event.data.json() : {}; } catch (e) { p = {}; }
+  const d = (p && p.data) || {};
+  const n = (p && p.notification) || {};
+  event.waitUntil((async () => {
+    const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Même critère que le SDK Firebase (hasVisibleClients) : une fenêtre
+    // visible gère elle-même son + bandeau + notification (app.js).
+    if (fenetres.some((c) => c.visibilityState === 'visible')) return;
+    await self.registration.showNotification(d.titre || n.title || 'MMB Service', {
+      body: d.corps || n.body || 'Nouveau message',
+      icon: 'icons/icon-192x192.png',
+      badge: 'icons/icon-192x192.png',
+      tag: 'chat-assistance',   // même étiquette que app.js : pas de doublon empilé
+      renotify: true,
+      data: { type: 'chat', convId: d.convId || '' }
+    });
+  })());
+});
+
+// ── VOLET 41 ── CLIC SUR UNE NOTIFICATION DE CHAT ──
+// Les notifications sont désormais affichées par ce service worker
+// (registration.showNotification dans app.js) : c'est donc ici que le clic
+// arrive. On ferme la notification, on ramène au premier plan une fenêtre
+// de l'app déjà ouverte (ou on en ouvre une), puis on lui demande d'ouvrir
+// le chat. Aucune donnée métier n'est touchée.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  if (!event.notification.data || event.notification.data.type !== 'chat') return;
+  event.waitUntil((async () => {
+    const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const cible = fenetres.find((c) => c.url && c.url.startsWith(self.registration.scope)) || fenetres[0];
+    if (cible) {
+      try { await cible.focus(); } catch (e) { /* focus refusé : on envoie quand même l'ordre */ }
+      cible.postMessage({ type: 'CHAT_OPEN' });
+      return;
+    }
+    // Aucune fenêtre ouverte : on ouvre l'app. L'utilisateur verra le badge
+    // de non-lus ; le chat n'est pas forcé (l'app doit d'abord se connecter).
+    if (self.clients.openWindow) await self.clients.openWindow(self.registration.scope);
+  })());
 });
 
 // ── FETCH : stratégie stale-while-revalidate pour le shell same-origin ──
@@ -98,9 +164,23 @@ self.addEventListener('fetch', (event) => {
       // Va chercher une version fraîche en tâche de fond, met à jour le
       // cache si ça réussit ; en cas d'échec réseau (coupure), on ignore
       // silencieusement l'erreur — la version en cache reste servie.
-      const network = fetch(req)
+      //
+      // ⚠️ On réutilise la réponse du NAVIGATION PRELOAD quand elle existe
+      // (voir activate) : sans cela, la requête lancée en parallèle par le
+      // navigateur serait purement et simplement gaspillée, et on en
+      // referait une seconde.
+      const network = Promise.resolve(event.preloadResponse)
+        .then((pre) => pre || fetch(req))
         .then((res) => {
-          if (res && res.ok) cache.put(req, res.clone());
+          // ⚠️ `res.ok` est vrai pour TOUT le 2xx, y compris 206 Partial
+          // Content (requête Range). Mettre un fragment en cache puis le
+          // servir en réponse à une requête complète donnerait un fichier
+          // TRONQUÉ — JavaScript coupé au milieu, page cassée, et le cache
+          // est persistant donc la panne survivrait aux rechargements.
+          // On n'accepte donc QUE les réponses 200 complètes.
+          if (res && res.status === 200 && res.type !== 'opaque') {
+            cache.put(req, res.clone());
+          }
           return res;
         })
         .catch(() => null);
